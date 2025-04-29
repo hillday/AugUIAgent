@@ -14,9 +14,12 @@ pyautogui.FAILSAFE = False
 api_key = os.environ.get("ARK_API_KEY")
 api_host = "https://ark.cn-beijing.volces.com/api/v3"
 
-vlm_model_ep = 'ep-20250418110236-jmbdw'
-uitars_model_ep = 'ep-20250417185159-jzzlk'
-planning_model_ep = 'ep-20250205161345-j59hz'
+# 视觉理解模型EP
+vlm_model_ep = 'ep-xxx'
+# UI TARS理解模型EP
+uitars_model_ep = 'ep-xxx'
+# 深度理解模型EP
+planning_model_ep = 'ep-xxx'
 
 uitars_command={
     "click":{"start_box":[0,0,0,0]},

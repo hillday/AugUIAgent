@@ -12,7 +12,8 @@ import pyautogui
 # 配置
 api_key = os.environ.get("ARK_API_KEY")
 api_host = "https://ark.cn-beijing.volces.com/api/v3"
-vlm_model_ep = 'ep-20250418110236-jmbdw'
+# 视觉理解模型EP
+vlm_model_ep = 'ep-xxx'
 
 # ----------- 1. 视频抽帧 -----------
 def extract_frames(video_path, output_dir, fps=1):
