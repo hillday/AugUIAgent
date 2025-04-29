@@ -4,10 +4,10 @@
 本项目结合了视频抽帧、多模态模型调用、任务推理和决策、自动操作执行等关键技术，使得UI Agent能够学习视频操作，确保了方案的可行性和有效性。同时，通过VLM辅助UI TARS进行任务状态判断，可以进一步提高UI智能代理的性能和稳定性。
 
 ## 学习视频
-学习如何在短视频应用中搜索、点赞、收藏等。
+学习如何在短视频应用中搜索、点赞、收藏等（demo5.mp4）。
 [学习视频](https://www.bilibili.com/video/BV1NjGCzyE1W/?vd_source=35bc330215defaf7822ec0773babe95f)
 ## UI Agent执行过程
-[操作演示](https://www.bilibili.com/video/BV1NjGCzyEfz/?vd_source=35bc330215defaf7822ec0773babe95f)
+[操作演示-example-zly-720.mp4](https://www.bilibili.com/video/BV1NjGCzyEfz/?vd_source=35bc330215defaf7822ec0773babe95f)
 
 # 使用步骤
 ## 环境准备
