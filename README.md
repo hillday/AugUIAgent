@@ -5,9 +5,9 @@
 
 ## 学习视频
 学习如何在短视频应用中搜索、点赞、收藏等。
-![](./demo5.mp4)
+![](https://www.bilibili.com/video/BV1NjGCzyE1W/?vd_source=35bc330215defaf7822ec0773babe95f)
 ## UI Agent执行过程
-![](./example-zly-720.mp4)
+![](https://www.bilibili.com/video/BV1NjGCzyEfz/?vd_source=35bc330215defaf7822ec0773babe95f)
 
 # 使用步骤
 ## 环境准备
