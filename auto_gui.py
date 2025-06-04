@@ -15,11 +15,11 @@ api_key = os.environ.get("ARK_API_KEY")
 api_host = "https://ark.cn-beijing.volces.com/api/v3"
 
 # 视觉理解模型EP
-vlm_model_ep = 'ep-xxx'
+vlm_model_ep = 'ep-20250418110236-jmbdw'
 # UI TARS理解模型EP
-uitars_model_ep = 'ep-xxx'
+uitars_model_ep = 'ep-20250417185159-jzzlk'
 # 深度理解模型EP
-planning_model_ep = 'ep-xxx'
+planning_model_ep = 'ep-20250417185051-xg7xf'
 
 uitars_command={
     "click":{"start_box":[0,0,0,0]},
@@ -65,15 +65,22 @@ def chat(messages,model, retries=1):
     return "错误: 无法获取响应"
 
 # ----------- 3. DeepSeek推理 -----------
-def plan_from_deepseek(frames_descriptions,task_description):
+def plan_from_deepseek(frames_descriptions,task_description,operation_summary=""):
     system_prompt = f"""
     你是一个智能助手，根据以下用户界面描述和任务描述，生成操作计划，使用JSON输出,直接输出结果，不需要任何标签、说明。
     界面描述：
     {frames_descriptions}
+    界面操作描述：
+    {operation_summary}
 
     输出格式如下:
-   [{{"instruction": "打开微信", "step": 0}}]  
-    `instruction` 为步骤具体指令，需要尽量的具体，`step` 为步骤序号，从0开始。务必只输出json, 直接输出内容，不要输出其他任何格式标签，如markdown json标签。
+   {{"steps":[{{"instruction": "打开微信", "step": 0}}], "loop_count": 100}}
+    `steps`为步骤集合，里面只需要有原子步骤，不需要包含重复指令步骤，如`返回搜索结果页，重复步骤3-6处`的步骤不需要,`instruction` 为步骤具体指令，需要尽量的具体，`step` 为步骤序号，从0开始。
+    
+    如果任务需要循环执行整个流程多次，请在JSON中添加一个额外的字段 `loop_count`，表示整个流程需要循环执行的次数，比如刷三个视频/帖子，就是要循环三次。
+    例如：{{"steps":[{{"instruction": "打开微信", "step": 0}}, {{"instruction": "发送消息", "step": 1}}], "loop_count": 100}}
+    
+    务必只输出json, 直接输出内容，不要输出其他任何格式标签，如markdown json标签。
 
     任务描述：
 
@@ -412,6 +419,9 @@ def execute_action(action_data):
             x = round((box[0] + box[2]) / 2)
             y = round((box[1] + box[3]) / 2)
             
+            if x == 0 or y == 0:
+                x = 1500
+                y = 1000
             pyautogui.moveTo(x, y)
             amount = -500 if direction == "down" else 500  # 滚动量
              # 记录操作
@@ -422,9 +432,9 @@ def execute_action(action_data):
                 "direction":direction,
                 "timestamp": time.time()
             })
-            # pyautogui.scroll(amount)
+            pyautogui.scroll(amount)
             print(f"[Scroll move] x={x}, y={y + amount,},direction={direction}")
-            pyautogui.dragTo(x, y + amount, duration=1)
+            # pyautogui.dragTo(x, y + amount, duration=1)
             
         elif action_data["action"] == "wait":
             # 记录操作
@@ -492,58 +502,109 @@ def main():
         # 从文件读取frame_descriptions
         with open("frame_descriptions.txt", "r", encoding="utf-8") as f:
             frame_descriptions = f.read()
-        task_description = "找赵丽颖的视频，找到点赞数量1000以上的视频给点赞和收藏"
+        
+        with open("operation_summary.txt", "r", encoding="utf-8") as f:
+            operation_summary = f.read()
+        
+        task_description = "找三个关于筑梦岛的帖子，打开点赞数超过200的帖子，给点赞，并且给热门的评论添加回复'我也喜欢'"
         #frame_descriptions = ""
         plan_json_text = plan_from_deepseek(frame_descriptions,task_description)
         print(f"Planned Step:{plan_json_text}")
         
-        plan = json.loads(plan_json_text)
-        last_response = None  # 记录上一次的响应
-
-        for step in plan:
-            start_time = time.time()
-            timeout = 180
-            finished = False
-            
-            while not finished and (time.time() - start_time) < timeout:
-                # 连续截取5张图
-                screenshot_paths = []
-                for i in range(5):
-                    path = f"current_screen_{i}.jpg"
-                    pyautogui.screenshot(path)
-                    screenshot_paths.append(path)
-                    time.sleep(1)  # 间隔1秒
-                
-                action = query_uitars(screenshot_paths, step["instruction"], last_response)
-                
-                last_response = action  # 保存当前响应
-                print(f"Step: {step['step']}")
-                execute_action(action)
-
-                screenshot_paths = []
-                for i in range(5):
-                    path = f"current_screen_{i}.jpg"
-                    pyautogui.screenshot(path)
-                    screenshot_paths.append(path)
-                    time.sleep(0.5)  # 间隔1秒
-                vlm_state = check_step_is_finished(screenshot_paths, step["instruction"], last_response)
-                print(f"VLM Check State is {vlm_state}")
-                
-                if action.get("action") == "finished" or "finished" in vlm_state:
-                    finished = True
-                    print(f"步骤 {step['step']} 完成: {uitars_command['finished']}")
+        # 解析计划和循环次数
+        try:
+            # 尝试解析包含loop_count的JSON格式
+            plan_data = json.loads(plan_json_text)
+            if isinstance(plan_data, dict) and "loop_count" in plan_data:
+                loop_count = plan_data.get("loop_count", 1)
+                plan = plan_data.get("steps", [])
+                print(f"任务将循环执行 {loop_count} 次")
+                print(f"计划步骤: {plan}")
+            elif isinstance(plan_data, list):
+                # 兼容旧格式，检查是否有额外的loop_count字段
+                if len(plan_data) > 0 and isinstance(plan_data[-1], dict) and "loop_count" in plan_data[-1] and "step" not in plan_data[-1]:
+                    loop_count = plan_data.pop().get("loop_count", 1)
+                    plan = plan_data
                 else:
-                    time.sleep(1)
-                
-                
+                    # 没有循环信息，默认执行一次
+                    loop_count = 1
+                    plan = plan_data
+        except json.JSONDecodeError:
+            # 如果JSON解析失败，尝试提取循环信息
+            import re
+            loop_match = re.search(r'"loop_count":\s*(\d+)', plan_json_text)
+            loop_count = int(loop_match.group(1)) if loop_match else 1
+            # 再次尝试解析计划部分
+            plan = json.loads(plan_json_text)
+        
+        print(f"任务将循环执行 {loop_count} 次")
+        
+        # 执行循环
+        for current_loop in range(loop_count):
+            print(f"\n开始执行第 {current_loop + 1}/{loop_count} 次循环")
+            last_response = None  # 每次循环重置上一次的响应
             
-            if not finished:
-                print(f"步骤 {step['step']} 执行超时")
+            # 执行当前循环的所有步骤
+            for step in plan:
+                print(f"执行步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}): {step['instruction']}")
+                
+                start_time = time.time()
+                timeout = 180
+                finished = False
+                
+                while not finished and (time.time() - start_time) < timeout:
+                    # 连续截取5张图
+                    screenshot_paths = []
+                    for i in range(5):
+                        path = f"current_screen_{i}.jpg"
+                        pyautogui.screenshot(path)
+                        screenshot_paths.append(path)
+                        time.sleep(1)  # 间隔1秒
+                    
+                    # 为指令添加当前循环信息
+                    current_instruction = f"{step['instruction']} (循环 {current_loop + 1}/{loop_count})"
+                    
+                    action = query_uitars(screenshot_paths, current_instruction, last_response)
+                    
+                    last_response = action  # 保存当前响应
+                    print(f"Step: {step['step']}")
+                    execute_action(action)
+
+                    screenshot_paths = []
+                    for i in range(5):
+                        path = f"current_screen_{i}.jpg"
+                        pyautogui.screenshot(path)
+                        screenshot_paths.append(path)
+                        time.sleep(0.5)  # 间隔1秒
+                    vlm_state = check_step_is_finished(screenshot_paths, current_instruction, last_response)
+                    print(f"VLM Check State is {vlm_state}")
+                    
+                    if action.get("action") == "finished" or "finished" in vlm_state:
+                        finished = True
+                        print(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 完成: {uitars_command['finished']}")
+                    else:
+                        time.sleep(1)
+                
+                if not finished:
+                    print(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 执行超时")
+                    # 可以选择是否继续执行当前循环的后续步骤
+                    # 如果要中断当前循环，可以添加 break
+            
+            print(f"完成第 {current_loop + 1}/{loop_count} 次循环")
+            
+            # 可以在循环之间添加一些延迟
+            if current_loop < loop_count - 1:
+                print("等待5秒后开始下一次循环...")
+                time.sleep(5)
+        
         # 保存记录
         save_action_records("action_records.json")
-    except ValueError as e:
-        print(f"错误: {e}")
-        return
+        print(f"任务执行完成，共循环 {loop_count} 次，操作记录已保存")
+        
+    except Exception as e:
+        print(f"执行过程中出错: {e}")
+        import traceback
+        traceback.print_exc()
 
 # 示例用法
 if __name__ == "__main__":

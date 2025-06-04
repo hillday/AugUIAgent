@@ -1,0 +1,39 @@
+{
+    "api_key": "xxxx",
+    "api_host": "https://ark.cn-beijing.volces.com/api/v3",
+    "models": {
+        "planning_model_ep": "ep-20250602164027-mjcbb",
+        "uitars_model_ep": "ep-20250602164553-wggnp",
+        "vlm_model_ep": "ep-20250602164553-wggnp"
+    },
+    "knowledge": {
+        "video_dir": "videos",
+        "processed_dir": "processed_videos",
+        "frame_interval": 5,
+        "max_frames": 30
+    },
+    "tasks": {
+        "history_file": "task_history.json",
+        "max_history": 100,
+        "timeout": 60,
+        "screenshot_count": 3,
+        "screenshot_interval": 0.3,
+        "log_dir": ""
+    },
+    "ui": {
+        "window_width": 1200,
+        "window_height": 800,
+        "theme": "light"
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "app.log",
+        "max_size": 10485760,
+        "backup_count": 5
+    },
+    "knowledge_base": {
+        "video_dir": "C:/project/RAG_Data/GUI_Agent/videos",
+        "frame_dir": "C:/project/RAG_Data/GUI_Agent/frames",
+        "fps": 2.0
+    }
+}
