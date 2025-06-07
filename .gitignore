@@ -3,6 +3,10 @@ EasyDesktopAgent/config/settings.json
 
 # 忽略日志目录
 EasyDesktopAgent/logs/
+EasyDesktopAgent/dist/
+dist/
+build/
+*.egg-info/
 
 # 忽略所有 Python 缓存目录
 **/__pycache__/
@@ -18,3 +22,4 @@ example-zly-720.mp4
 operation_summary.txt
 test_scroll.py
 xiaohs.mp4
+wx-*.mp4

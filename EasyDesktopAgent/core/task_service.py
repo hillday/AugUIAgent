@@ -4,6 +4,13 @@ import time
 import pyautogui
 import threading
 import sys
+import base64
+import requests
+import win32gui
+import win32con
+
+pyautogui.FAILSAFE = False
+
 sys.path.append("..")
 from utils.logger import logger as Logger
 
@@ -79,6 +86,11 @@ class TaskService:
             # 调用DeepSeek推理生成计划
             plan_json = self.query_deepseek(frame_descriptions, task_description)
             self.log(f"已生成执行计划: {plan_json}", progress_callback)
+
+            # 最小化应用窗口，避免干扰
+            self.log("最小化应用窗口，开始执行操作", progress_callback)
+            hwnd = win32gui.GetForegroundWindow()
+            win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
             
             # 解析计划
             try:
@@ -134,6 +146,9 @@ class TaskService:
             self.save_task_history(task_history)
             
             self.log("任务执行完成", progress_callback)
+             # 恢复应用窗口
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
             return True
             
         except Exception as e:
@@ -148,6 +163,9 @@ class TaskService:
             self.save_task_history(task_history)
             
             self.log(f"任务执行失败: {e}", progress_callback)
+             # 恢复应用窗口
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
             raise
     
     def log(self, message, callback=None):
@@ -175,18 +193,28 @@ class TaskService:
             raise ValueError("API密钥或模型EP未配置")
         
         system_prompt = f"""
-        你是一个智能助手，根据以下用户界面描述和任务描述，生成操作计划，使用JSON输出,直接输出结果，不需要任何标签、说明。
+        你是一个智能助手，根据以下用户界面描述和任务描述，生成操作计划。
+
         界面描述：
         {frames_descriptions}
 
-        输出格式如下:
+        输出要求：
+        1. 仅输出有效的JSON数据
+        2. 不使用任何代码块标记（如```json```）
+        3. 不添加任何解释文字
+        4. 直接以{{开始，以}}结束
+
+        JSON格式：
         {{"steps":[{{"instruction": "打开微信", "step": 0}}], "loop_count": 100}}
-        `steps`为步骤集合，里面只需要有原子步骤，不需要包含重复指令步骤，如`返回搜索结果页，重复步骤3-6处`的步骤不需要,`instruction` 为步骤具体指令，需要尽量的具体，`step` 为步骤序号，从0开始。
-        
-        如果任务需要循环执行整个流程多次，请在JSON中添加一个额外的字段 `loop_count`，表示整个流程需要循环执行的次数，比如刷三个视频/帖子，就是要循环三次。
-        例如：{{"steps":[{{"instruction": "打开微信", "step": 0}}, {{"instruction": "发送消息", "step": 1}}], "loop_count": 100}}
-        
-        务必只输出json, 直接输出内容，不要输出其他任何格式标签，如markdown json标签。
+
+        字段说明：
+        - steps：操作步骤数组，包含原子操作，不包含重复循环类指令
+        - instruction：具体操作指令，要求详细明确
+        - step：步骤序号，从0开始递增
+        - loop_count：整个流程循环次数（如需要）
+
+        输出示例：
+        {{"steps":[{{"instruction": "打开微信", "step": 0}}, {{"instruction": "发送消息", "step": 1}}], "loop_count": 3}}
 
         任务描述：
         """
@@ -234,11 +262,6 @@ class TaskService:
         import win32con
         import io
         from PIL import Image
-        
-        # 最小化应用窗口，避免干扰
-        self.log("最小化应用窗口，开始执行操作", progress_callback)
-        hwnd = win32gui.GetForegroundWindow()
-        win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
         
         # 获取配置信息
         api_key = self.config_manager.get('api_key', '')
@@ -536,11 +559,22 @@ class TaskService:
                     
                 elif action_data["action"] == "type":
                     self.log(f"[输入] {uitars_command['type']}", progress_callback)
-                    # 先将文本复制到剪贴板
-                    import pyperclip
-                    pyperclip.copy(uitars_command["type"])
-                    # 然后使用快捷键粘贴
-                    pyautogui.hotkey('ctrl', 'v')
+                    # 检查文本是否包含换行符
+                    text_to_type = uitars_command["type"]
+                    if "\n" in text_to_type:
+                        lines = text_to_type.split("\n")
+                        for i, line in enumerate(lines):
+                            if line:
+                                pyperclip.copy(line)
+                                pyautogui.hotkey('ctrl', 'v')
+                            if i < len(lines) - 1:
+                                pyautogui.press('enter')
+                    else:
+                        # 先将文本复制到剪贴板
+                        import pyperclip
+                        pyperclip.copy(text_to_type)
+                        # 然后使用快捷键粘贴
+                        pyautogui.hotkey('ctrl', 'v')
                     
                 elif action_data["action"] == "scroll":
                     box = convert_coords(uitars_command["scroll"]["start_box"])
@@ -586,6 +620,7 @@ class TaskService:
             execute_action(action, uitars_cmd)
 
             # 再次截图检查是否完成
+            '''
             screenshot_paths = []
             for i in range(screenshot_count):
                 path = f"current_screen_{i}.jpg"
@@ -595,8 +630,8 @@ class TaskService:
             
             vlm_state = check_step_is_finished(screenshot_paths, current_instruction, last_response)
             self.log(f"状态检查结果: {vlm_state}", progress_callback)
-            
-            if action.get("action") == "finished" or "finished" in vlm_state:
+            '''
+            if action.get("action") == "finished":
                 finished = True
                 self.log(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 完成", progress_callback)
             else:
@@ -605,6 +640,3 @@ class TaskService:
         if not finished:
             self.log(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 执行超时", progress_callback)
         
-        # 恢复应用窗口
-        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
