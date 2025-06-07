@@ -16,8 +16,8 @@
         "history_file": "task_history.json",
         "max_history": 100,
         "timeout": 60,
-        "screenshot_count": 3,
-        "screenshot_interval": 0.3,
+        "screenshot_count": 5,
+        "screenshot_interval": 1,
         "log_dir": ""
     },
     "ui": {

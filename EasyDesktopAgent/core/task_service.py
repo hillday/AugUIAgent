@@ -635,6 +635,7 @@ class TaskService:
                 finished = True
                 self.log(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 完成", progress_callback)
             else:
+                self.log(f"步骤 {step['step']} (循环 {current_loop + 1}/{loop_count}) 未完成，状态为：{action.get("action")}", progress_callback)
                 time.sleep(1)
         
         if not finished:
